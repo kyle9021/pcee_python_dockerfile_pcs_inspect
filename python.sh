@@ -1,4 +1,3 @@
-  GNU nano 4.8                                                                                     python.sh                                                                                               
 #!/bin/bash
 
 source /src/.env
