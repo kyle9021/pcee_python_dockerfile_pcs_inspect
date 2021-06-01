@@ -24,3 +24,5 @@ step 3: `docker build -t pcee_python_inspect_report:1 .`
 step 4: `docker run -it --name pcee_python_inspect_report:1 -v $PWD:/src pcee_python_inspect_report:1`
 
 step 5: after it runs it will create a report in the directory. Open the report with excel or other csv/table editor. 
+
+step 6: `docker rm pcee_python_inspect_report` so you can run it again at a later time without worrying about the duplicate names. 
