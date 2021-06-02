@@ -9,13 +9,13 @@ Assumptions:
 * you have git installed
 * you're working with a debian distribution of Linux
 * you will add the .env file to your .gitignore file
-* you understand how to harden this process if using for a production environment
+* you understand how to harden this process if using for a production environment, some ideas:
       
-     delete the .env file after building the docker container or `chmod 700 .env` and add file to .gitignore etc. 
-     ensure user password is set correctly
-     use vault to retrieve inject the access and secret key
-     ensure you're not mounting this to the root file system of the host
-     never check into a public image repo
+     * delete the .env file after building the docker container or `chmod 700 .env` and add file to .gitignore etc. 
+     * ensure user password is set correctly
+     * use vault to retrieve inject the access and secret key
+     * ensure you're not mounting this to the root file system of the host
+     * never check into a public image repo
 
 # Instructions
 
