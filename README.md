@@ -10,6 +10,7 @@ Assumptions:
 * you're working with a debian distribution of Linux
 * you will add the .env file to your .gitignore file
 * you understand how to harden this process if using for a production environment
+      
       * delete the .env file after building the docker container or `chmod 700 .env` and add file to .gitignore etc. 
 
 # Instructions
