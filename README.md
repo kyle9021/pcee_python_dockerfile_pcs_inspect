@@ -21,7 +21,7 @@ Assumptions:
 
 step 1: `git clone https://github.com/Kyle9021/PCEE_PYTHON_DOCKERFILE_PCS_INSPECT`
 
-step 2: `cd PCEE_PYTHON_DOCKERFILE_PCS_INSPECT`
+step 2: `cd PCEE_PYTHON_DOCKERFILE_PCS_INSPECT/`
 
 step 3: `nano .env` and assign variables according to your environment
 
