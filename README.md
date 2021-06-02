@@ -5,8 +5,8 @@ This is a simple way to containerize a python script which avoids the need to ma
 
 Assumptions:
 
-* you have docker installed
-* you have git installed
+* you have docker installed ([How to install docker on Ubuntu 20.04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-20-04))
+* you have git installed (`sudo apt-get install git`)
 * you're working with a debian distribution of Linux
 * you will add the .env file to your .gitignore file
 * you understand how to harden this process if using for a production environment, some ideas:
