@@ -1,7 +1,7 @@
 # PCEE_PYTHON_DOCKERFILE_PCS_INSPECT
 Purpose:
 
-This is a simple way to containerize a python script which avoids the need to manage virtual environments and different versions of python on your local machine. This report can provide high level KPIs for a customer using Prisma Cloud Enterprise Edition. Note the python script used wass created by Tom Kishel at Palo Alto Networks. See his github here! https://github.com/tkishel/pcs-inspect
+This is a simple way to containerize a python script which avoids the need to manage virtual environments and different versions of python on your local machine. This report can provide high level KPIs for a customer using Prisma Cloud Enterprise Edition. Note the python script used was created by Tom Kishel at Palo Alto Networks. See his github here! https://github.com/tkishel/pcs-inspect
 
 Assumptions:
 
