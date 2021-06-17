@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+#!/usr/bin/env python3
+
 import argparse
 import json
 import math
@@ -8,6 +10,7 @@ import pandas as pd
 import re
 import requests
 from requests.exceptions import RequestException
+from shutil import which
 import sys
 
 ##########################################################################################
@@ -160,7 +163,7 @@ def make_api_call(method, url, requ_data=None):
         sess = requests.Session()
         # GlobalProtect generates 'ignore self signed certificate in certificate chain' errors.
         # Set 'REQUESTS_CA_BUNDLE' to a valid CA bundle including the 'Palo Alto Networks Inc Root CA' used by GlobalProtect.
-        # Hint: Copy the bundle provided by the certifi module (locate via 'python -m certifi') and append the 'Palo Alto Networks Inc Root CA' 
+        # Hint: Copy the bundle provided by the certifi module (locate via 'python -m certifi') and append the 'Palo Alto Networks Inc Root CA'
         if 'REQUESTS_CA_BUNDLE' in os.environ:
             resp = sess.send(prep, timeout=(CONFIG['API_TIMEOUTS']), verify="%s" % os.environ['REQUESTS_CA_BUNDLE'])
         else:
@@ -407,6 +410,36 @@ def get_integrations(output_file_name):
     result_file.write(api_response)
     result_file.close()
 
+#### WIP
+
+def get_cloud_resources(output_file_name, cloud_accounts_list=[]):
+    delete_file_if_exists(output_file_name)
+    resource_list = []
+    for cloud_account in cloud_accounts_list:
+        body_params = {
+            'filters':[
+                {'operator':'=', 'name':'includeEventForeignEntities', 'value': 'false'},
+                {'operator':'=', 'name':'asset.severity', 'value': 'all'},
+                {'operator':'=', 'name':'cloud.account',  'value': '%s' % cloud_account['name']},
+                {'operator':'=', 'name':'cloud.type',     'value': '%s' % cloud_account['deploymentType']},
+                {'operator':'=', 'name':'scan.status',    'value': 'all'}],
+            'limit': 1000,
+            'timeRange': {'type': 'to_now'}
+        }
+        if CONFIG['SUPPORT_API_MODE']:
+            body_params['customerName'] = CONFIG['CUSTOMER_NAME']
+            request_data = json.dumps(body_params)
+            # api_response = make_api_call('POST', '%s/_support/WIP' % CONFIG['PRISMA_API_ENDPOINT'], request_data)
+            api_response = []
+        else:
+            request_data = json.dumps(body_params)
+            api_response = make_api_call('POST', '%s/resource' % CONFIG['PRISMA_API_ENDPOINT'], request_data)
+        resource_list.append(api_response)
+
+    result_file = open(output_file_name, 'wb')
+    result_file.write(resource_list)
+    result_file.close()
+
 ##########################################################################################
 # Collect mode: Query the API and write the results to files.
 ##########################################################################################
@@ -420,17 +453,31 @@ def collect_data():
         output()
     CONFIG['PRISMA_API_HEADERS']['x-redlock-auth'] = token
     output()
-    output('Querying Assets: Time Range: %s' % CONFIG['TIME_RANGE_LABEL'])
-    get_assets(CONFIG['RESULTS_FILE']['ASSETS'])
-    output('Results saved as: %s' % CONFIG['RESULTS_FILE']['ASSETS'])
-    output()
-    output('Querying Policies')
+    output('Querying Policies (please wait)')
     get_policies(CONFIG['RESULTS_FILE']['POLICIES'])
     output('Results saved as: %s' % CONFIG['RESULTS_FILE']['POLICIES'])
     output()
+    output('Generating Prisma Cloud API Token')
+    token = get_prisma_login()
+    if CONFIG['DEBUG_MODE']:
+        output()
+        output(token)
+        output()
+    CONFIG['PRISMA_API_HEADERS']['x-redlock-auth'] = token
     output('Querying Alerts: Time Range: %s (please wait)' % CONFIG['TIME_RANGE_LABEL'])
     get_alerts(CONFIG['RESULTS_FILE']['ALERTS'])
     output('Results saved as: %s' % CONFIG['RESULTS_FILE']['ALERTS'])
+    output()
+    output('Generating Prisma Cloud API Token')
+    token = get_prisma_login()
+    if CONFIG['DEBUG_MODE']:
+        output()
+        output(token)
+        output()
+    CONFIG['PRISMA_API_HEADERS']['x-redlock-auth'] = token
+    output('Querying Assets: Time Range: %s' % CONFIG['TIME_RANGE_LABEL'])
+    get_assets(CONFIG['RESULTS_FILE']['ASSETS'])
+    output('Results saved as: %s' % CONFIG['RESULTS_FILE']['ASSETS'])
     output()
     output('Querying Users')
     get_users(CONFIG['RESULTS_FILE']['USERS'])
@@ -454,15 +501,34 @@ def collect_data():
     output()
 
 ##########################################################################################
+# Collect mode: Pretty the input files ... using jq to avoid encoding errors.
+##########################################################################################
+
+def format_collected_data():
+    if which('jq') is None:
+        return
+    for this_result_file in CONFIG['RESULTS_FILE']:
+        this_file = CONFIG['RESULTS_FILE'][this_result_file]
+        temp_file = '%s.temp' % this_file
+        if not os.path.isfile(this_file):
+          output('Error: Query result file does not exist: %s' % this_file)
+          sys.exit(1)
+        os.system('cat %s | jq > %s' % (this_file, temp_file))
+        os.system('mv %s %s' % (temp_file, this_file))
+        output('Formatting: %s' % this_file)
+        output()
+
+##########################################################################################
 # Process mode: Read the input files.
 ##########################################################################################
 
 def read_collected_data():
     for this_result_file in CONFIG['RESULTS_FILE']:
-        if not os.path.isfile(CONFIG['RESULTS_FILE'][this_result_file]):
-          output('Error: Query result file does not exist: %s' % CONFIG['RESULTS_FILE'][this_result_file])
+        this_file = CONFIG['RESULTS_FILE'][this_result_file]
+        if not os.path.isfile(this_file):
+          output('Error: Query result file does not exist: %s' % this_file)
           sys.exit(1)
-        with open(CONFIG['RESULTS_FILE'][this_result_file], 'r', encoding='utf8') as f:
+        with open(this_file, 'r', encoding='utf8') as f:
           DATA[this_result_file] = json.load(f)
 
 ##########################################################################################
@@ -509,14 +575,14 @@ def process_collected_data():
         'mode':                 {'custom': 0, 'default': 0},
         'policy':               {'disabled': 0, 'deleted': 0},
         'status_by_feature': {
-            'remediable':       {'open': 0, 'dismissed': 0, 'snoozed': 0, 'resolved': 0}, 
+            'remediable':       {'open': 0, 'dismissed': 0, 'snoozed': 0, 'resolved': 0},
         },
         'severity':             {'high': 0, 'medium': 0, 'low': 0},
         'status':               {'open': 0, 'dismissed': 0, 'snoozed': 0, 'resolved': 0},
         'severity_by_status': {
-            'open':             {'high': 0, 'medium': 0, 'low': 0}, 
+            'open':             {'high': 0, 'medium': 0, 'low': 0},
             'dismissed':        {'high': 0, 'medium': 0, 'low': 0},
-            'snoozed':          {'high': 0, 'medium': 0, 'low': 0}, 
+            'snoozed':          {'high': 0, 'medium': 0, 'low': 0},
             'resolved':         {'high': 0, 'medium': 0, 'low': 0},
         },
         'type':                 {'anomaly': 0, 'audit_event': 0, 'config': 0, 'data': 0, 'iam': 0, 'network': 0},
@@ -525,11 +591,13 @@ def process_collected_data():
     }
     RESULTS['deleted_policies_from_alerts']  = {}
     RESULTS['disabled_policies_from_alerts'] = {}
+    RESULTS['resources_from_alerts'] = {}
     process_alerts(DATA['ALERTS'])
     # SUMMARY
     RESULTS['summary'] = {}
     RESULTS['summary']['count_of_assets'] = 0
     RESULTS['summary']['count_of_aggregated_open_alerts'] = 0
+    RESULTS['summary']['count_of_resources_with_alerts_from_alerts'] = 0
     RESULTS['summary']['count_of_compliance_standards_with_alerts_from_policies'] = 0
     RESULTS['summary']['count_of_compliance_standards_with_alerts_from_alerts']   = 0
     RESULTS['summary']['count_of_policies_with_alerts_from_policies']             = 0
@@ -574,14 +642,18 @@ def process_policies(policies):
         RESULTS['policies'][this_policy_id]['policyEnabled']       = this_policy['enabled']
         RESULTS['policies'][this_policy_id]['policySeverity']      = this_policy['severity']
         RESULTS['policies'][this_policy_id]['policyType']          = this_policy['policyType']
+        RESULTS['policies'][this_policy_id]['policySubTypes']      = this_policy['policySubTypes']
+        RESULTS['policies'][this_policy_id]['policyCategory']      = this_policy['policyCategory']
+        RESULTS['policies'][this_policy_id]['policyClass']         = this_policy['policyClass']
         RESULTS['policies'][this_policy_id]['policyCloudType']     = this_policy['cloudType'].lower()
         RESULTS['policies'][this_policy_id]['policyShiftable']     = 'build' in this_policy['policySubTypes']
         RESULTS['policies'][this_policy_id]['policyRemediable']    = this_policy['remediable']
         RESULTS['policies'][this_policy_id]['policySystemDefault'] = this_policy['systemDefault']
+        RESULTS['policies'][this_policy_id]['policyLabels']        = this_policy['labels']
         if 'policyUpi' in this_policy:
             RESULTS['policies'][this_policy_id]['policyUpi'] = this_policy['policyUpi']
         else:
-            RESULTS['policies'][this_policy_id]['policyUpi'] = 'CUSTOM'
+            RESULTS['policies'][this_policy_id]['policyUpi'] = 'UNKNOWN'
         # Alerts
         if CONFIG['SUPPORT_API_MODE']:
             if this_policy['name'] in RESULTS['alerts_aggregated_by']['policy']:
@@ -623,7 +695,7 @@ def process_policies(policies):
 # SUPPORT_API_MODE: Substitute aggregated Alerts (as '/_support/policy' does not return openAlertsCount).
 ##########################################################################################
 
-def process_alerts(alerts):    
+def process_alerts(alerts):
     if CONFIG['SUPPORT_API_MODE']:
         RESULTS['policy_counts_from_alerts']['severity']['high']    = RESULTS['alerts_aggregated_by']['severity']['high']
         RESULTS['policy_counts_from_alerts']['severity']['medium']  = RESULTS['alerts_aggregated_by']['severity']['medium']
@@ -653,7 +725,12 @@ def process_alerts(alerts):
                     RESULTS['alert_counts_from_alerts']['resolved_by_resource']['deleted'] += 1
                 if this_alert['reason'] == 'RESOURCE_UPDATED':
                     RESULTS['alert_counts_from_alerts']['resolved_by_resource']['updated'] += 1
+            if 'resource' in this_alert:
+                if 'rrn' in this_alert['resource']:
+                    RESULTS['resources_from_alerts'][this_alert['resource']['rrn']] = this_alert['resource']['rrn']
+            #
             # This is all of the data we can collect without a reference to a Policy.
+            #
             if not this_policy_id in RESULTS['policies']:
                 if this_alert['reason'] == 'POLICY_DELETED':
                     RESULTS['deleted_policies_from_alerts'].setdefault(this_policy_id, 0)
@@ -692,6 +769,7 @@ def process_summary():
         RESULTS['summary']['count_of_policies_with_alerts_from_policies']         = len(RESULTS['alerts_aggregated_by']['policy'])
         RESULTS['summary']['count_of_aggregated_open_alerts']                     = RESULTS['alerts_aggregated_by']['status']['open']
     else:
+        RESULTS['summary']['count_of_resources_with_alerts_from_alerts']          = len(RESULTS['resources_from_alerts'].keys())
         RESULTS['summary']['count_of_policies_with_alerts_from_policies']         = sum(v['alertCount'] != 0 for k,v in RESULTS['policies'].items())
         RESULTS['summary']['count_of_open_closed_alerts']                         = len(DATA['ALERTS'])
     RESULTS['summary']['count_of_compliance_standards_with_alerts_from_policies'] = sum(v != {'high': 0, 'medium': 0, 'low': 0} for k,v in RESULTS['compliance_standards_from_policies'].items())
@@ -717,6 +795,14 @@ def output_collected_data():
     output_alerts_summary(panda_writer)
     save_sheet(panda_writer)
     output('Results saved as: %s' % CONFIG['OUTPUT_FILE_XLS'])
+
+##
+
+def upi_group(policy_upi = ''):
+    upi_search = re.search('^(.*?)\-(\d+)$', policy_upi)
+    if upi_search:
+        return upi_search.group(1)
+    return policy_upi
 
 ##
 
@@ -762,7 +848,10 @@ def output_utilization(panda_writer):
         ('Users Disabled',                 sum(x.get('enabled') == False for x in DATA['USERS'])),
         ('Users Enabled',                  sum(x.get('enabled') == True for x in DATA['USERS'])),
     ]
-    write_sheet(panda_writer, 'Utilization', rows)
+    if CONFIG['SUPPORT_API_MODE']:
+        rows.append(('',''))
+        rows.append(('Data Collected using the Support API',''))
+    write_sheet(panda_writer, 'Utilization Summary', rows)
 
 ##
 
@@ -775,7 +864,7 @@ def output_alerts_by_compliance_standard(panda_writer):
         alert_count_high   = RESULTS['compliance_standards_from_policies'][compliance_standard_name]['high']
         alert_count_medium = RESULTS['compliance_standards_from_policies'][compliance_standard_name]['medium']
         alert_count_low    = RESULTS['compliance_standards_from_policies'][compliance_standard_name]['low']
-        rows.append((compliance_standard_name, alert_count_high, alert_count_medium, alert_count_low) )
+        rows.append((compliance_standard_name, alert_count_high, alert_count_medium, alert_count_low))
     write_sheet(panda_writer, 'Open Alerts by Standard', rows)
     if not CONFIG['SUPPORT_API_MODE']:
         rows = []
@@ -796,36 +885,48 @@ def output_alerts_by_policy(panda_writer):
     output('Saving Alerts by Policy Worksheet(s)')
     output()
     rows = []
-    rows.append(('Policy', 'UPI', 'Alert Count', 'Enabled', 'Severity', 'Type', 'Cloud Type', 'With IAC', 'With Remediation', 'Compliance Standards'))
+    rows.append(('Policy', 'UPI', 'UPI Group', 'Default', 'Alert Count', 'Enabled', 'Severity', 'Type', 'SubTypes', 'Category', 'Class', 'Cloud Provider', 'With IAC', 'With Remediation', 'Labels', 'Compliance Standards'))
     # Consider replacing sorted(RESULTS['policies_by_name']) with sorted(RESULTS['policies'], key=lambda x: (RESULTS['policies'][x]['name'])
     for policy_name in sorted(RESULTS['policies_by_name']):
         this_policy_id        = RESULTS['policies_by_name'][policy_name]['policyId']
         policy_upi            = RESULTS['policies'][this_policy_id]['policyUpi']
+        policy_upi_group      = upi_group(policy_upi)
+        policy_default        = RESULTS['policies'][this_policy_id]['policySystemDefault']
         policy_alert_count    = RESULTS['policies'][this_policy_id]['alertCount']
         policy_enabled        = RESULTS['policies'][this_policy_id]['policyEnabled']
-        policy_severity       = RESULTS['policies'][this_policy_id]['policySeverity']
-        policy_type           = RESULTS['policies'][this_policy_id]['policyType']
-        policy_cloud_type     = RESULTS['policies'][this_policy_id]['policyCloudType']
+        policy_severity       = RESULTS['policies'][this_policy_id]['policySeverity'].title()
+        policy_subtypes       = ', '.join(RESULTS['policies'][this_policy_id]['policySubTypes']).upper()
+        policy_type           = RESULTS['policies'][this_policy_id]['policyType'].title()
+        policy_category       = RESULTS['policies'][this_policy_id]['policyCategory'].title()
+        policy_class          = RESULTS['policies'][this_policy_id]['policyClass'].title()
+        policy_cloud_type     = RESULTS['policies'][this_policy_id]['policyCloudType'].upper()
         policy_is_shiftable   = RESULTS['policies'][this_policy_id]['policyShiftable']
         policy_is_remediable  = RESULTS['policies'][this_policy_id]['policyRemediable']
-        policy_standards_list = ','.join(map(str, RESULTS['policies'][this_policy_id]['complianceStandards']))
-        rows.append((policy_name, policy_upi, policy_alert_count, policy_enabled, policy_severity, policy_type, policy_cloud_type, policy_is_remediable, policy_is_remediable, policy_standards_list))
+        policy_labels         = ', '.join(RESULTS['policies'][this_policy_id]['policyLabels'])
+        policy_standards_list = ', '.join(map(str, RESULTS['policies'][this_policy_id]['complianceStandards']))
+        rows.append((policy_name, policy_upi, policy_upi_group, policy_default, policy_alert_count, policy_enabled, policy_severity, policy_type, policy_subtypes, policy_category, policy_class, policy_cloud_type, policy_is_remediable, policy_is_remediable, policy_labels, policy_standards_list))
     write_sheet(panda_writer, 'Open Alerts by Policy', rows)
     if not CONFIG['SUPPORT_API_MODE']:
         rows = []
-        rows.append(('Policy', 'Enabled', 'UPI', 'Severity', 'Type', 'With IAC', 'With Remediation', 'Alert Count', 'Compliance Standards'))
+        rows.append(('Policy', 'UPI', 'UPI Group', 'Default', 'Alert Count', 'Enabled', 'Severity', 'Type', 'SubTypes', 'Category', 'Class', 'Cloud Provider', 'With IAC', 'With Remediation', 'Labels', 'Compliance Standards'))
         for policy_name in sorted(RESULTS['policies_from_alerts']):
             this_policy_id        = RESULTS['policies_from_alerts'][policy_name]['policyId']
             policy_upi            = RESULTS['policies'][this_policy_id]['policyUpi']
-            policy_alert_count    = RESULTS['policies_from_alerts'][policy_name]['alertCount'] # Not RESULTS['policies'][this_policy_id]['openAlertsCount'] 
+            policy_upi_group      = upi_group(policy_upi)
+            policy_default        = RESULTS['policies'][this_policy_id]['policySystemDefault']
+            policy_alert_count    = RESULTS['policies_from_alerts'][policy_name]['alertCount'] # Not RESULTS['policies'][this_policy_id]['openAlertsCount']
             policy_enabled        = RESULTS['policies'][this_policy_id]['policyEnabled']
-            policy_severity       = RESULTS['policies'][this_policy_id]['policySeverity']
-            policy_type           = RESULTS['policies'][this_policy_id]['policyType']
-            policy_cloud_type     = RESULTS['policies'][this_policy_id]['policyCloudType']
+            policy_severity       = RESULTS['policies'][this_policy_id]['policySeverity'].title()
+            policy_type           = RESULTS['policies'][this_policy_id]['policyType'].title()
+            policy_subtypes       = ', '.join(RESULTS['policies'][this_policy_id]['policySubTypes']).upper()
+            policy_category       = RESULTS['policies'][this_policy_id]['policyCategory'].title()
+            policy_class          = RESULTS['policies'][this_policy_id]['policyClass'].title()
+            policy_cloud_type     = RESULTS['policies'][this_policy_id]['policyCloudType'].upper()
             policy_is_shiftable   = RESULTS['policies'][this_policy_id]['policyShiftable']
             policy_is_remediable  = RESULTS['policies'][this_policy_id]['policyRemediable']
-            policy_standards_list = ','.join(map(str, RESULTS['policies'][this_policy_id]['complianceStandards']))
-            rows.append((policy_name, policy_upi, policy_alert_count, policy_enabled, policy_severity, policy_type, policy_cloud_type, policy_is_remediable, policy_is_remediable, policy_standards_list))
+            policy_labels         = ', '.join(RESULTS['policies'][this_policy_id]['policyLabels'])
+            policy_standards_list = ', '.join(map(str, RESULTS['policies'][this_policy_id]['complianceStandards']))
+            rows.append((policy_name, policy_upi, policy_upi_group, policy_default, policy_alert_count, policy_enabled, policy_severity, policy_type, policy_subtypes, policy_category, policy_class, policy_cloud_type, policy_is_remediable, policy_is_remediable, policy_labels, policy_standards_list))
         rows.append((''))
         rows.append((''))
         rows.append(('Time Range: %s' % CONFIG['TIME_RANGE_LABEL'], ''))
@@ -877,6 +978,8 @@ def output_alerts_summary(panda_writer):
     write_sheet(panda_writer, 'Open Alerts Summary', rows)
     if not CONFIG['SUPPORT_API_MODE']:
         rows = [
+            ('Number of Assets with Alerts',                RESULTS['summary']['count_of_resources_with_alerts_from_alerts']),
+            ('',''),
             ('Number of Compliance Standards with Alerts',  RESULTS['summary']['count_of_compliance_standards_with_alerts_from_alerts']),
             ('',''),
             ('Number of Policies with Alerts',              RESULTS['summary']['count_of_policies_with_alerts_from_alerts']),
@@ -959,6 +1062,10 @@ if CONFIG['RUN_MODE'] in ['collect', 'auto']:
     output('Collecting Data')
     output()
     collect_data()
+    output('Formatting Data')
+    output()
+    format_collected_data()
+    output()
 
 if CONFIG['RUN_MODE'] == 'collect':
     output("Run '%s --customer_name %s --mode process' to process the collected data and save to a spreadsheet." % (os.path.basename(__file__), CONFIG['CUSTOMER_NAME']))
