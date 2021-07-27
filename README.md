@@ -27,10 +27,8 @@ step 3: `nano .env` and assign variables according to your environment
 
 step 4: `docker build -t pcee_python_inspect_report:1 .`
 
-step 5: `docker run -it --name pcee_python_inspect_report -v $PWD:/src pcee_python_inspect_report:1`
+step 5: `docker run --rm -it --name pcee_python_inspect_report -v $PWD:/src pcee_python_inspect_report:1`
 
 step 6: after it runs it will create a report in the directory. Open the report with excel or other csv/table editor. 
 
-step 7: `docker rm pcee_python_inspect_report` so you can run it again at a later time without worrying about the duplicate names. 
-
-step 8: move the report files to a different directory or delete them. To create the report again repeat steps 2, & 5-7.
+step 7: move the report files to a different directory or delete them. To create the report again repeat steps 2, & 5-7.
