@@ -1,9 +1,13 @@
-on: [ push, workflow_dispatch ]
+
+name: Prisma Cloud Compute Image Scan
+
+on: [push, pull_request]
 
 env:
   IMAGE_NAME: ${{ github.repository }}:${{ github.sha }}
 
 jobs:
+  # Jobs are ran independently from each other, so build and scan needs to be in a single job.
   build-and-scan:
     name: Build and scan image
     runs-on: ubuntu-latest
@@ -11,22 +15,15 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
+        # Defaults are sufficient generally
+        # https://github.com/actions/checkout#usage
 
+      - name: Download twistcli from the Prisma Cloud Compute Console
+        run: |
+          curl --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
+          chmod a+x ./twistcli
       - name: Build the image
         run: docker build -t $IMAGE_NAME .
 
-      - name: Prisma Cloud image scan
-        id: scan
-        uses: PaloAltoNetworks/prisma-cloud-scan@v1
-        with:
-          pcc_console_url: ${{ secrets.PCC_CONSOLE_URL }}
-          pcc_user: ${{ secrets.PCC_USER }}
-          pcc_pass: ${{ secrets.PCC_PASS }}
-          image_name: ${{ env.IMAGE_NAME }}
-
-      # (Optional) for compatibility with GitHub's code scanning alerts
-      - name: Upload SARIF file
-        if: ${{ always() }} # necessary if using failure thresholds in the image scan
-        uses: github/codeql-action/upload-sarif@v1
-        with:
-          sarif_file: ${{ steps.scan.outputs.sarif_file }}
+      - name: Scan the image
+        run: ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} --user $${{ secrets.PCC_USER }} --password ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
