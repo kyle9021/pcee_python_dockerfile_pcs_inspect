@@ -26,4 +26,4 @@ jobs:
         run: docker build -t $IMAGE_NAME .
 
       - name: Scan the image
-        run: ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} --user ${{ secrets.PCC_USER }} --password ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
+        run: ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
