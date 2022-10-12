@@ -29,6 +29,6 @@ jobs:
           PCC_CONSOLE_URL: ${{ secrets.PCC_CONSOLE_URL }}
         run: |
           echo "Username is: ${{ secrets.PCC_USER }}"
-          curl --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli  ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
+          curl -v --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli  ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
           chmod a+x ./twistcli
           ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
