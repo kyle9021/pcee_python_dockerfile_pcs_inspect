@@ -18,8 +18,8 @@ jobs:
         uses: actions/checkout@v2
         # Defaults are sufficient generally
         # https://github.com/actions/checkout#usage
-      - name: Build the image
-        run: docker build -t $IMAGE_NAME .
+    #  - name: Build the image
+   #     run: docker build -t $IMAGE_NAME .
       - name: test the directory
         run: ls
       - name: Scan the image
@@ -28,6 +28,7 @@ jobs:
           PCC_PASS: ${{ secrets.PCC_PASS }}
           PCC_CONSOLE_URL: ${{ secrets.PCC_CONSOLE_URL }}
         run: |
+          echo "Username is: $PCC_USER"
           curl --user $PCC_USER:$PCC_PASS --output ./twistcli $PCC_CONSOLE_URL/api/v1/util/twistcli
           chmod a+x ./twistcli
           ./twistcli images scan --address $PCC_CONSOLE_URL -u $PCC_USER -p $PCC_PASS --details $IMAGE_NAME
