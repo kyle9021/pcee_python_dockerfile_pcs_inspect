@@ -17,15 +17,12 @@ jobs:
         uses: actions/checkout@v2
         # Defaults are sufficient generally
         # https://github.com/actions/checkout#usage
-
-      - name: Download twistcli from the Prisma Cloud Compute Console
-        run: |
-          curl --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
-          chmod a+x ./twistcli
       - name: Build the image
         run: docker build -t $IMAGE_NAME .
       - name: test the directory
         run: ls
       - name: Scan the image
         run: |
+          curl --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
+          chmod a+x ./twistcli
           ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
