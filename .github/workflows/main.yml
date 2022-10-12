@@ -28,4 +28,4 @@ jobs:
         run: ls
       - name: Scan the image
         run: |
-        ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
+          ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
