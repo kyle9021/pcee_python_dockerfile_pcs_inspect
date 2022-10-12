@@ -28,6 +28,6 @@ jobs:
           PCC_PASS: ${{ secrets.PCC_PASS }}
         run: |
           echo "Username is: ${{ secrets.PCC_USER }}"
-          curl -v --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli  --url "https://us-east1.cloud.twistlock.com/us-2-158256885/api/v1/util/twistcli"
+          wget --header "Authorization: Basic $(echo -n  ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} | base64 | tr -d '\n')" "https://us-east1.cloud.twistlock.com/us-2-158256885/api/v1/util/twistcli"
           chmod a+x ./twistcli
           ./twistcli images scan --address "https://us-east1.cloud.twistlock.com/us-2-158256885" -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
