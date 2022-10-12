@@ -26,9 +26,8 @@ jobs:
         env:
           PCC_USER: ${{ secrets.PCC_USER }}
           PCC_PASS: ${{ secrets.PCC_PASS }}
-          PCC_CONSOLE_URL: ${{ secrets.PCC_CONSOLE_URL }}
         run: |
           echo "Username is: ${{ secrets.PCC_USER }}"
-          curl -v --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli  ${{ secrets.PCC_CONSOLE_URL }}/api/v1/util/twistcli
+          curl -v --user ${{ secrets.PCC_USER }}:${{ secrets.PCC_PASS }} --output ./twistcli  --url "https://us-east1.cloud.twistlock.com/us-2-158256885/api/v1/util/twistcli"
           chmod a+x ./twistcli
-          ./twistcli images scan --address ${{ secrets.PCC_CONSOLE_URL }} -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
+          ./twistcli images scan --address "https://us-east1.cloud.twistlock.com/us-2-158256885" -u ${{ secrets.PCC_USER }} -p ${{ secrets.PCC_PASS }} --details $IMAGE_NAME
